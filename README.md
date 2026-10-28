@@ -1,65 +1,77 @@
-# Jahvantè Town — playable p5.js portfolio
+# Jahvantè Town — Interactive p5.js Portfolio
 
-A top-down village game built by **adapting the code structure of `GameProjectFinal.zip`**, the supplied University of London p5.js game project. The original was a horizontal side-scroller. This version uses a scrolling overhead camera with houses as the portfolio sections.
+A playable pixel-art village. Explore buildings to learn about Jahvantè's software projects, work experience, and credentials. Talk to interactive villagers for personal trivia.
 
-## Play it locally
+## Run locally
 
-You do **not** need Node, React, Vite, or any package installation. For a zero-setup demo, double-click **`playable-preview.html`**. It is a standalone file with p5.js, game code, résumé and optional sound effects embedded. It also works when sent by itself.
+No `npm install` and no frameworks required.
 
 ```bash
-cd Jahvante_P5_Village_Portfolio
 python3 -m http.server 8000
 ```
 
-Open **http://localhost:8000**. The game uses native ES modules, so don't just double-click `index.html` from a `file://` URL.
+Then open http://localhost:8000/ in a browser.
+
+To deploy the folder to Vercel, choose **Other** as the framework, leave the build command empty and select the project root as the output directory. A `vercel.json` is included. Don't deploy private PDFs or letters that you don't want to share publicly.
 
 ## Controls
 
-- **Arrow keys / WASD**: Move the original green-alien-inspired character around the village.
-- **E / Enter / Space**: Enter the house when near its door.
-- **Mouse**: Click a house to open its content directly.
-- **Mobile/touch**: Use the on-screen D-pad. Building directory buttons also work without movement.
-- **Esc**: Exit the current house panel.
-- **SFX OFF/ON**: Optional sounds, off by default. Sound effects are from the original uploaded game.
-- **Return to town square**: Reset the avatar's position.
+- Click/tap **ground** to walk there automatically.
+- Click/tap a **house** to walk to its entrance and open it.
+- Click/tap an **NPC** to walk next to the villager and start a conversation.
+- **WASD / arrow keys** move manually and cancel automatic movement.
+- Near a villager: press **E / Enter / Space**, or click **TALK**.
+- Near a house: press **E / Enter / Space**, or click **ENTER**.
+- In the conversation popup: **ANOTHER FACT** gives a different fact; **BYE** or **Escape** closes it.
+- The building directory on the right is an accessible shortcut to each room.
 
-## The houses
+Each NPC draws facts from the same shuffled deck of seven different curiosities. No fact is repeated until the deck is exhausted, including between NPCs. Each new cycle also avoids repeating the immediately previous fact.
 
-| House | Portfolio content |
-| --- | --- |
-| Project Lab | API, GameFilter, E-Commerce case studies and public links |
-| Guild Hall | Freelance, FinSight AI, and Trep DigitalX experience |
-| Skill Shop | Technology stack and learning roadmap |
-| My Home | Profile, approach, University of London, App Academy, Mia Academy |
-| Trophy Hall | Coding Temple specialist badges, developer certificates, additional training and professional reference letters |
-| Post Office | Email, GitHub, LinkedIn, downloadable résumé |
+## Project layout
 
-## Where to edit
+```text
+index.html                  Web page layout & accessible conversation markup
+styles.css                  All responsive visual styles
+vercel.json                 Static hosting configuration
+assets/                     Local p5 runtime, badges, certificates, sounds
+js/
+  main.js                   Bootstraps the p5 village
+  data/
+    content.js              Portfolio work, projects, buildings and badges
+    npcs.js                 Villager definitions + seven personal facts
+  game/
+    config.js               Map dimensions and appearance
+    character.js            Player sprite
+    npcCharacters.js        Villager sprites and hit detection
+    curiosityDeck.js        Non-repeating random fact logic
+    logic.js                Physics, movement, collision, proximity
+    navigation.js           Click-to-move routing and paths to NPCs
+    scenery.js              Grass, paths, trees, buildings, pond
+    collectable.js          Tech collectibles
+    sketch.js               Main p5 setup/draw/input loop
+  ui/
+    controls.js             Buttons, village guide and sound
+    npcDialogue.js          Accessible conversation popup
+    panels.js               Portfolio building content panels
+  tests/
+    curiosityDeck.test.mjs  Tests unique and non-repeating facts
+    npcNavigation.test.mjs   Checks paths to each villager
+  tools/
+    build_standalone.py     Creates a single, offline playable HTML
+```
 
-- `js/data/content.js`: **All the content, project links, experience, skills and house metadata**.
-- `js/game/sketch.js`: p5 instance-mode lifecycle (`setup`, `draw`, keyboard, mouse).
-- `js/game/character.js`: Sprite based on the original game's green alien in a purple suit.
-- `js/game/logic.js`: Input movement, collision and camera.
-- `js/game/scenery.js`: Grass, roads, rooftops, pond, signs, trees and NPCs.
-- `js/game/collectable.js`: Original Collectable concept adapted to technology tokens.
-- `js/ui/panels.js`: Accessible room/dialog content and close behavior.
-- `js/ui/controls.js`: Directory, action buttons, mobile D-pad, optional sound.
-- `styles.css`: All layout and interface styling.
+## Customize villagers
 
-## Why this structure?
+Open **`js/data/npcs.js`**. Change names, coordinates, clothing colors, or entries in the `curiosities` array. You do not need to change the rendering or dialogue modules.
 
-It follows the original game's separation of `sketch.js`, `other/character.js`, `other/logic.js`, and `scenery` / collectables, while converting global-style p5 code into **ES modules + p5 instance mode**. There is no dependency on React or npm and no use of official Pokémon graphics, characters or sounds. The look is an original, classic top-down RPG village.
+## Generate an offline playable file
 
-## Notes
+```bash
+python3 tools/build_standalone.py
+```
 
-The included résumé and credentials are copies of the uploaded documents. Python is used to prepare web-friendly thumbnail images and build the portable preview; the playable browser game remains native JavaScript / p5.js. Project links are drawn from the previous portfolio and should be verified before public deployment. Information in the experience and project text is sourced from the supplied résumé and previous portfolio. The Trep DigitalX role is listed explicitly, with RIBER Italia as a client project.
+The generated `playable-npc-village.html` embeds its assets. This standalone file is intended for local sharing; deploy the structured source files to Vercel instead.
 
-The original uploaded game may have custom rights/attributions for its music; this site includes only its short sound effects and does not autoplay audio. Remove or replace any effects if you do not have rights to publish them.
+## Privacy
 
-## Adding and maintaining credentials
-
-- Certificate metadata lives in `js/data/content.js`, in the `badges`, `certificates`, `recommendations`, and `additionalTraining` arrays.
-- Original PDFs and image thumbnails are stored in `assets/credentials/`.
-- To regenerate thumbnails from PDFs, use Python / PyMuPDF before running the standalone bundle script.
-- The standalone `playable-preview.html` embeds all credential PDFs and images to work offline.
-- **Before publishing publicly:** review the uploaded letters and certificates for personal details (including dates of birth, document numbers, and referees’ email addresses), and confirm permission to share recommendation letters. For a public version, it may be better to provide summaries and only share full recommendation letters on request.
+The public project contains basic contact links, portfolio information, selected certificates and specialist badges. Full letters of recommendation and sensitive source certificates with birth dates are not shipped.

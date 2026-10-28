@@ -29,19 +29,20 @@
         <section class="intro" aria-labelledby="page-title">
           <div><div class="eyebrow"><span class="eyebrow__light"></span> PLAYER 01 <span class="eyebrow__divider">//</span> READY TO EXPLORE</div>
           <h1 id="page-title">A PORTFOLIO <em>YOU CAN PLAY.</em></h1>
-          <p>A little starter village built with p5.js. Move the alien around, explore the houses, and discover the real projects, skills, credentials, and experience behind <strong>Jahvantè Tota</strong>.</p></div>
+          <p>A little starter village built with p5.js. Click or tap to explore the houses, meet friendly NPC villagers, and discover projects, skills, credentials, and fun personal facts about <strong>Jahvantè Tota</strong>.</p></div>
           <div class="intro__side"><span>GAME FILE 01 / VILLAGE</span><strong>FULL-STACK<br/>DEVELOPER</strong><small>REACT · TYPESCRIPT · PYTHON · APIs</small></div>
         </section>
 
         <section class="game-layout" aria-label="Interactive developer portfolio">
           <div class="console">
             <div class="console__top"><span><span class="console__red"></span><span class="console__yellow"></span><span class="console__green"></span> JAHVANTE_VILLAGE / OVERWORLD</span><span class="console__right">v1.0 · P5.JS</span></div>
-            <div id="game-stage" class="game-stage" tabindex="0" aria-label="Playable top-down village. Use WASD or arrow keys to walk. Press E or Enter at a house door to explore its section. Alternatively use the building menu to the right.">
+            <div id="game-stage" class="game-stage" tabindex="0" aria-label="Playable top-down village. Click a villager to walk over and talk. Click a building to enter it. Click or tap the ground to move. You can also use WASD or arrow keys and press E or Enter near a villager or building.">
               <div id="game-canvas" aria-hidden="true"></div>
               <div class="game-stage__location" aria-hidden="true"><span class="location-orb"></span> STARTER VILLAGE</div>
               <div class="game-stage__title" aria-hidden="true">JAHVANTÈ<br />TOWN</div>
-              <div class="game-stage__prompt" id="walk-prompt" aria-live="polite">WALK TO A HOUSE ENTRANCE</div>
+              <div class="game-stage__prompt" id="walk-prompt" aria-live="polite">CLICK OR TAP TO MOVE</div>
               <button class="game-stage__interact hidden" type="button" id="canvas-enter">E · ENTER HOUSE</button>
+              <button class="game-stage__interact hidden" type="button" id="canvas-talk">E · TALK TO VILLAGER</button>
               <div class="game-stage__toast" id="collect-toast" aria-live="polite"></div>
               <div class="game-stage__map-id" aria-hidden="true">MAP 01 / JT-01</div>
             </div>
@@ -57,6 +58,7 @@
                 <p>I'm Jahvantè, a full-stack developer. Walk up to any building to reveal what I've worked on.</p>
               </div>
               <button id="enter-button" type="button" class="action-button" disabled>WALK TO A HOUSE <span>↗</span></button>
+              <button id="talk-button" type="button" class="action-button action-button--talk" hidden>TALK TO VILLAGER ↗</button>
             </div>
 
             <div class="side-card side-card--buildings">
@@ -73,7 +75,7 @@
                   <button data-move="down" class="control-pad__down" aria-label="Move down">▼</button>
                   <button data-move="right" class="control-pad__right" aria-label="Move right">▶</button>
                 </div>
-                <div class="control-help"><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to move</p><p><kbd>E</kbd> / <kbd>ENTER</kbd> open a nearby door</p><p><kbd>ESC</kbd> close any open panel</p></div>
+                <div class="control-help"><p><strong>CLICK / TAP</strong> to walk, enter a building, or talk to an NPC</p><p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrow keys to move</p><p><kbd>E</kbd> / <kbd>ENTER</kbd> talk to a villager or enter a nearby door</p><p><kbd>ESC</kbd> close any open panel</p></div>
               </div>
               <button class="reset-button" id="return-to-square" type="button">↺ RETURN TO TOWN SQUARE</button>
             </div>
@@ -94,6 +96,26 @@
       <div id="portfolio-panel" class="portfolio-panel" role="dialog" aria-modal="true" aria-labelledby="panel-heading" tabindex="-1">
         <div class="portfolio-panel__top"><span id="panel-kicker">LOCATION DISCOVERED</span><button id="close-panel" class="portfolio-panel__close" type="button" aria-label="Close panel">✕ <span>CLOSE</span></button></div>
         <div class="portfolio-panel__body" id="panel-body"></div>
+      </div>
+    </div>
+    <!-- NPC conversations have their own accessible dialog, independent of project panels. -->
+    <div id="npc-dialog-backdrop" class="npc-dialog-backdrop" hidden>
+      <div id="npc-dialog-card" class="npc-dialog" role="dialog" aria-modal="true" aria-labelledby="npc-dialog-name" aria-describedby="npc-dialog-fact">
+        <div class="npc-dialog__top"><span>✦ VILLAGER CONVERSATION</span><span>JAHVANTÈ TOWN</span></div>
+        <div class="npc-dialog__body">
+          <div class="npc-dialog__avatar" aria-hidden="true">?</div>
+          <div class="npc-dialog__copy">
+            <span id="npc-dialog-role" class="npc-dialog__role"></span>
+            <h2 id="npc-dialog-name"></h2>
+            <p class="npc-dialog__intro">Psst... did you know?</p>
+            <p class="npc-dialog__fact" id="npc-dialog-fact" aria-live="polite"></p>
+          </div>
+        </div>
+        <div class="npc-dialog__actions">
+          <button id="npc-dialog-next" type="button">✦ ANOTHER FACT</button>
+          <button id="npc-dialog-close" type="button">BYE! ↗</button>
+        </div>
+        <p class="npc-dialog__hint">Seven different facts. You won't hear the same one until you've heard them all!</p>
       </div>
     </div>
     <noscript><p class="no-script">JavaScript is required for the playable map. You can still view the résumé <a href="./assets/Jahvante_Tota_Resume.pdf">here</a>.</p></noscript>
