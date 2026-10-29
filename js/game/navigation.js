@@ -2,19 +2,27 @@
  * Click-to-move navigation for Jahvantè Town.
  *
  * Responsibilities:
- * - Find routes through the village
+ * - Calculate routes using A* pathfinding
  * - Prefer streets over grass
- * - Avoid buildings, water and NPCs
+ * - Avoid buildings, the pond, and villagers
  * - Navigate to building entrances
- * - Approach villagers for conversations
- * - Move the player along a calculated route
+ * - Approach villagers for dialogue
+ * - Move the player along calculated routes
  *
- * Movement and collision rules live in logic.js.
+ * Map layout:
+ * ./mapLayout.js
+ *
+ * Player movement and collisions:
+ * ./logic.js
+ *
+ * Character rendering is handled separately.
  */
 
 import { TILE, COLS, ROWS, WORLD_WIDTH, WORLD_HEIGHT } from "./config.js";
 
 import { canWalkAt, clamp, stepToward } from "./logic.js";
+
+import { movementCostForTile } from "./mapLayout.js";
 
 import { buildings } from "../data/content.js";
 
@@ -24,13 +32,12 @@ import { npcPosition } from "./npcCharacters.js";
    NAVIGATION SETTINGS
    ========================================= */
 
-const ROAD_COST = 1;
-const GRASS_COST = 3;
-
 const ARRIVAL_DISTANCE = 4;
 
 const NPC_TALK_DISTANCE = TILE * 2.5;
 
+// The player moves between adjacent tiles.
+// Diagonal paths are intentionally excluded.
 const DIRECTIONS = [
   [0, -1],
   [1, 0],
@@ -39,64 +46,13 @@ const DIRECTIONS = [
 ];
 
 /* =========================================
-   STREET LOCATIONS
+   COORDINATE UTILITIES
    ========================================= */
 
 /**
- * These rectangles match the streets
- * drawn in scenery.js in Step 12.
+ * Convert tile coordinates into world pixels.
  *
- * Coordinates are in tiles:
- * [left, top, right, bottom]
- *
- * In a future refactor, these definitions
- * should be shared by scenery and navigation
- * rather than maintained in two files.
- */
-const ROAD_AREAS = [
-  // Main east-west street.
-  [6, 19, 57, 22],
-
-  // Northern entrance paths.
-  [11, 12, 13, 21],
-  [31, 11, 33, 21],
-  [50, 12, 52, 21],
-
-  // Connecting streets.
-  [23, 21, 25, 37],
-  [39, 21, 41, 37],
-
-  // Southern east-west street.
-  [11, 35, 53, 37],
-
-  // Town square.
-  [29, 23, 36, 26],
-];
-
-/**
- * Check whether a tile is part of a road.
- */
-function isRoadTile(x, y) {
-  return ROAD_AREAS.some(([left, top, right, bottom]) => {
-    return x >= left && x <= right && y >= top && y <= bottom;
-  });
-}
-
-/**
- * Roads are preferred.
- * Grass remains walkable.
- */
-function movementCost(x, y) {
-  return isRoadTile(x, y) ? ROAD_COST : GRASS_COST;
-}
-
-/* =========================================
-   GRID UTILITIES
-   ========================================= */
-
-/**
- * Convert tile coordinates to the
- * center of a tile in world pixels.
+ * Returns the center of the tile.
  */
 function tileCenter(x, y) {
   return {
@@ -106,8 +62,7 @@ function tileCenter(x, y) {
 }
 
 /**
- * Convert world coordinates to
- * tile coordinates.
+ * Convert a world position into a tile.
  */
 function toTile(position) {
   return {
@@ -118,14 +73,23 @@ function toTile(position) {
 }
 
 /**
- * Convert a tile to a unique array index.
+ * Check that a tile exists in the map.
  */
-function cellIndex(x, y) {
+function isInsideGrid(x, y) {
+  return x >= 0 && x < COLS && y >= 0 && y < ROWS;
+}
+
+/**
+ * Convert a tile coordinate into
+ * a unique number.
+ */
+function tileIndex(x, y) {
   return y * COLS + x;
 }
 
 /**
- * Convert an array index back to a tile.
+ * Convert an index back into
+ * tile coordinates.
  */
 function indexToTile(index) {
   return {
@@ -135,34 +99,34 @@ function indexToTile(index) {
 }
 
 /**
- * Check whether a tile coordinate is valid.
+ * Calculate distance between two points.
  */
-function isInsideGrid(x, y) {
-  return x >= 0 && y >= 0 && x < COLS && y < ROWS;
+function distanceBetween(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 /* =========================================
-   LINE-OF-SIGHT CHECK
+   COLLISION-FREE SEGMENTS
    ========================================= */
 
 /**
- * Check whether the player can travel
- * in a straight line between two points.
+ * Verify that a straight movement segment
+ * does not cross an obstacle.
  *
- * Used to safely connect world positions
- * to the pathfinding grid.
+ * Check multiple points along the segment,
+ * rather than only its endpoints.
  */
-function segmentIsClear(from, to, pond) {
-  const distance = Math.hypot(to.x - from.x, to.y - from.y);
+function isSegmentClear(from, to, pond) {
+  const distance = distanceBetween(from, to);
 
   const steps = Math.max(1, Math.ceil(distance / 3));
 
   for (let i = 0; i <= steps; i++) {
-    const fraction = i / steps;
+    const progress = i / steps;
 
-    const x = from.x + (to.x - from.x) * fraction;
+    const x = from.x + (to.x - from.x) * progress;
 
-    const y = from.y + (to.y - from.y) * fraction;
+    const y = from.y + (to.y - from.y) * progress;
 
     if (!canWalkAt(x, y, pond)) {
       return false;
@@ -173,15 +137,16 @@ function segmentIsClear(from, to, pond) {
 }
 
 /* =========================================
-   FIND A WALKABLE POSITION
+   NEAREST WALKABLE DESTINATION
    ========================================= */
 
 /**
- * Find the closest available tile center
- * when the requested destination is blocked.
+ * Find the nearest available position.
  *
- * For example, clicking water should not
- * make the character walk into the pond.
+ * If the requested position is already
+ * walkable, return it unchanged.
+ *
+ * Otherwise, search nearby tile centers.
  */
 function nearestWalkablePosition(position, pond) {
   if (canWalkAt(position.x, position.y, pond)) {
@@ -193,8 +158,8 @@ function nearestWalkablePosition(position, pond) {
   const maxRadius = Math.max(COLS, ROWS);
 
   for (let radius = 0; radius < maxRadius; radius++) {
-    let nearest = null;
-    let nearestDistance = Infinity;
+    let best = null;
+    let bestDistance = Infinity;
 
     for (
       let y = Math.max(0, origin.y - radius);
@@ -206,12 +171,9 @@ function nearestWalkablePosition(position, pond) {
         x <= Math.min(COLS - 1, origin.x + radius);
         x++
       ) {
-        const ringDistance = Math.max(
-          Math.abs(x - origin.x),
-          Math.abs(y - origin.y),
-        );
+        const ring = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y));
 
-        if (ringDistance !== radius) {
+        if (ring !== radius) {
           continue;
         }
 
@@ -221,32 +183,33 @@ function nearestWalkablePosition(position, pond) {
           continue;
         }
 
-        const distance = Math.hypot(
-          candidate.x - position.x,
-          candidate.y - position.y,
-        );
+        const distance = distanceBetween(candidate, position);
 
-        if (distance < nearestDistance) {
-          nearest = candidate;
-          nearestDistance = distance;
+        if (distance < bestDistance) {
+          best = candidate;
+          bestDistance = distance;
         }
       }
     }
 
-    if (nearest) {
-      return nearest;
+    if (best) {
+      return best;
     }
   }
 
   return null;
 }
 
+/* =========================================
+   GRID ANCHOR
+   ========================================= */
+
 /**
- * Find a walkable grid tile that can
- * be reached directly from a position.
+ * Find a nearby walkable grid position
+ * directly reachable from a world position.
  *
- * This prevents the first or last movement
- * segment from cutting through an obstacle.
+ * This safely connects a player or destination
+ * to the tile-based navigation grid.
  */
 function findGridAnchor(position, pond) {
   const origin = toTile(position);
@@ -254,8 +217,8 @@ function findGridAnchor(position, pond) {
   const maxRadius = Math.max(COLS, ROWS);
 
   for (let radius = 0; radius < maxRadius; radius++) {
-    let nearest = null;
-    let nearestDistance = Infinity;
+    let best = null;
+    let bestDistance = Infinity;
 
     for (
       let y = Math.max(0, origin.y - radius);
@@ -267,12 +230,9 @@ function findGridAnchor(position, pond) {
         x <= Math.min(COLS - 1, origin.x + radius);
         x++
       ) {
-        const ringDistance = Math.max(
-          Math.abs(x - origin.x),
-          Math.abs(y - origin.y),
-        );
+        const ring = Math.max(Math.abs(x - origin.x), Math.abs(y - origin.y));
 
-        if (ringDistance !== radius) {
+        if (ring !== radius) {
           continue;
         }
 
@@ -282,24 +242,21 @@ function findGridAnchor(position, pond) {
           continue;
         }
 
-        if (!segmentIsClear(position, candidate, pond)) {
+        if (!isSegmentClear(position, candidate, pond)) {
           continue;
         }
 
-        const distance = Math.hypot(
-          candidate.x - position.x,
-          candidate.y - position.y,
-        );
+        const distance = distanceBetween(position, candidate);
 
-        if (distance < nearestDistance) {
-          nearest = { x, y };
-          nearestDistance = distance;
+        if (distance < bestDistance) {
+          best = { x, y };
+          bestDistance = distance;
         }
       }
     }
 
-    if (nearest) {
-      return nearest;
+    if (best) {
+      return best;
     }
   }
 
@@ -311,9 +268,10 @@ function findGridAnchor(position, pond) {
    ========================================= */
 
 /**
- * Add a node to the priority queue.
+ * Insert a node into a minimum-priority heap.
  *
- * Lower priority numbers are processed first.
+ * Nodes with lower estimated costs
+ * are processed first.
  */
 function pushFrontier(heap, node) {
   heap.push(node);
@@ -334,7 +292,7 @@ function pushFrontier(heap, node) {
 }
 
 /**
- * Remove the lowest-cost node.
+ * Remove the lowest-priority node.
  */
 function popFrontier(heap) {
   if (heap.length === 0) {
@@ -379,26 +337,38 @@ function popFrontier(heap) {
 }
 
 /* =========================================
+   A* HEURISTIC
+   ========================================= */
+
+/**
+ * Estimate the remaining travel cost.
+ *
+ * Manhattan distance is appropriate
+ * because the grid uses four directions.
+ *
+ * The minimum possible movement cost is 1,
+ * so this remains an admissible heuristic.
+ */
+function heuristic(x, y, targetX, targetY) {
+  return Math.abs(targetX - x) + Math.abs(targetY - y);
+}
+
+/* =========================================
    A* PATHFINDING
    ========================================= */
 
 /**
- * Estimate the remaining distance
- * between two tiles.
+ * Calculate a route between two positions.
  *
- * Uses Manhattan distance because
- * the navigation grid has four directions.
- */
-function heuristic(x, y, targetX, targetY) {
-  return (Math.abs(targetX - x) + Math.abs(targetY - y)) * ROAD_COST;
-}
-
-/**
- * Find a collision-free route using A*.
+ * Uses movementCostForTile() from
+ * mapLayout.js instead of maintaining
+ * a separate road definition.
  *
- * Road tiles are cheaper than grass tiles,
- * encouraging the character to follow
- * the village streets.
+ * The algorithm prefers:
+ * - Roads
+ * - The town square
+ *
+ * Grass remains available as an alternative.
  *
  * Returns world-pixel waypoints or null.
  */
@@ -410,9 +380,9 @@ function findGridPath(from, to, pond) {
     return null;
   }
 
-  const source = cellIndex(start.x, start.y);
+  const source = tileIndex(start.x, start.y);
 
-  const destination = cellIndex(end.x, end.y);
+  const destination = tileIndex(end.x, end.y);
 
   const totalCells = COLS * ROWS;
 
@@ -431,11 +401,12 @@ function findGridPath(from, to, pond) {
 
   pushFrontier(frontier, {
     index: source,
+
     priority: heuristic(start.x, start.y, end.x, end.y),
   });
 
   /* =====================================
-     SEARCH FOR THE DESTINATION
+     SEARCH
      ===================================== */
 
   while (frontier.length > 0) {
@@ -455,6 +426,12 @@ function findGridPath(from, to, pond) {
 
     const { x, y } = indexToTile(currentIndex);
 
+    const currentPosition = tileCenter(x, y);
+
+    /* ===================================
+       CHECK NEIGHBORING TILES
+       =================================== */
+
     for (const [dx, dy] of DIRECTIONS) {
       const nextX = x + dx;
       const nextY = y + dy;
@@ -463,7 +440,7 @@ function findGridPath(from, to, pond) {
         continue;
       }
 
-      const nextIndex = cellIndex(nextX, nextY);
+      const nextIndex = tileIndex(nextX, nextY);
 
       if (visited[nextIndex]) {
         continue;
@@ -471,18 +448,28 @@ function findGridPath(from, to, pond) {
 
       const nextPosition = tileCenter(nextX, nextY);
 
+      // The destination tile must be walkable.
       if (!canWalkAt(nextPosition.x, nextPosition.y, pond)) {
         continue;
       }
 
-      const newCost = costs[currentIndex] + movementCost(nextX, nextY);
+      // The segment between tiles must also
+      // be free from obstacles.
+      if (!isSegmentClear(currentPosition, nextPosition, pond)) {
+        continue;
+      }
+
+      /* =================================
+         SHARED MAP MOVEMENT COST
+         ================================= */
+
+      const newCost = costs[currentIndex] + movementCostForTile(nextX, nextY);
 
       if (newCost >= costs[nextIndex]) {
         continue;
       }
 
       costs[nextIndex] = newCost;
-
       parents[nextIndex] = currentIndex;
 
       const priority = newCost + heuristic(nextX, nextY, end.x, end.y);
@@ -503,7 +490,7 @@ function findGridPath(from, to, pond) {
   }
 
   /* =====================================
-     RECONSTRUCT THE ROUTE
+     RECONSTRUCT PATH
      ===================================== */
 
   const route = [];
@@ -530,10 +517,10 @@ function findGridPath(from, to, pond) {
    ========================================= */
 
 /**
- * Return the building clicked by the player.
+ * Detect whether the user clicked
+ * within a building's footprint.
  *
- * Uses the building footprints defined
- * in content.js.
+ * Returns the building or null.
  */
 export function hitBuilding(x, y) {
   return (
@@ -544,16 +531,17 @@ export function hitBuilding(x, y) {
         y >= building.y * TILE &&
         y < (building.y + building.h) * TILE
       );
-    }) || null
+    }) ?? null
   );
 }
 
 /* =========================================
-   CLICK NAVIGATION CONTROLLER
+   NAVIGATION CONTROLLER
    ========================================= */
 
 /**
- * Create the navigation controller.
+ * Create a navigation controller
+ * for the current player.
  *
  * @param {Object} player
  * @param {Object} pond
@@ -572,8 +560,12 @@ export function createClickNavigation(
 
   let action = null;
 
+  /* =====================================
+     RESET NAVIGATION
+     ===================================== */
+
   /**
-   * Stop the current route.
+   * Stop moving and clear the route.
    */
   function reset() {
     waypoints = [];
@@ -583,9 +575,13 @@ export function createClickNavigation(
     player.walking = false;
   }
 
+  /* =====================================
+     COMPLETE AN ACTION
+     ===================================== */
+
   /**
-   * Perform an action after reaching
-   * the destination.
+   * Execute the action associated
+   * with the completed route.
    */
   function completeAction(completedAction) {
     if (!completedAction) {
@@ -601,44 +597,53 @@ export function createClickNavigation(
     }
   }
 
+  /* =====================================
+     FOLLOW A CALCULATED ROUTE
+     ===================================== */
+
   /**
-   * Calculate a route and prepare
-   * the player to follow it.
+   * Calculate a route and store
+   * the waypoints for the game loop.
    */
   function followRoute(target, nextAction = null) {
-    const distance = Math.hypot(player.x - target.x, player.y - target.y);
+    const distance = distanceBetween(player, target);
 
     // Already at the destination.
     if (distance < ARRIVAL_DISTANCE) {
       reset();
+
       completeAction(nextAction);
+
       return true;
     }
 
+    // Calculate the route using shared
+    // street movement costs.
     const route = findGridPath(player, target, pond);
 
     if (!route) {
       return false;
     }
 
-    // Keep the tile-center route intact.
-    //
-    // This is intentional: smoothing straight
-    // across the map could bypass the roads.
+    /* ===================================
+       PREPARE WAYPOINTS
+       =================================== */
 
+    // Remove the first waypoint only
+    // when the player is already there.
     waypoints = route.filter((point, index) => {
       if (index > 0) {
         return true;
       }
 
-      return Math.hypot(player.x - point.x, player.y - point.y) > 1;
+      return distanceBetween(player, point) > 1;
     });
 
+    // Add the exact destination after
+    // the tile-center waypoints.
     const last = waypoints.at(-1) ?? player;
 
-    // Finish at the actual destination,
-    // not only the center of its grid tile.
-    if (Math.hypot(last.x - target.x, last.y - target.y) > 1) {
+    if (distanceBetween(last, target) > 1) {
       waypoints.push(target);
     }
 
@@ -649,19 +654,23 @@ export function createClickNavigation(
   }
 
   /* =====================================
-     NAVIGATE TO TERRAIN OR A BUILDING
+     NAVIGATE TO A BUILDING OR TERRAIN
      ===================================== */
 
   /**
-   * Navigate to a clicked destination.
+   * Move to a clicked map position.
    *
-   * If a building was clicked, navigate
-   * to its entrance instead of its walls.
+   * When a building is selected,
+   * navigate to its entrance.
    */
   function navigateTo(x, y, building = null) {
     reset();
 
     let desired;
+
+    /* ===================================
+       BUILDING ENTRANCE
+       =================================== */
 
     if (building) {
       desired = {
@@ -670,6 +679,10 @@ export function createClickNavigation(
         y: building.doorY * TILE + TILE / 2 + 13,
       };
     } else {
+
+    /* ===================================
+       NORMAL TERRAIN
+       =================================== */
       desired = {
         x: clamp(x, 12, WORLD_WIDTH - 12),
 
@@ -677,12 +690,16 @@ export function createClickNavigation(
       };
     }
 
+    // If the destination is blocked,
+    // find an accessible nearby tile.
     const target = nearestWalkablePosition(desired, pond);
 
     if (!target) {
       return false;
     }
 
+    // Opening a building is only performed
+    // after the route is completed.
     const nextAction = building
       ? {
           type: "building",
@@ -694,29 +711,32 @@ export function createClickNavigation(
   }
 
   /* =====================================
-     NAVIGATE TO NPC
+     NAVIGATE TO A VILLAGER
      ===================================== */
 
   /**
-   * Approach a villager without walking
-   * through the villager's collision area.
+   * Approach a villager closely enough
+   * to start their dialogue.
    *
-   * Stop close enough to start dialogue.
+   * Do not walk directly into the NPC.
    */
   function navigateToNPC(npc) {
     reset();
 
     const position = npcPosition(npc);
 
-    const distance = Math.hypot(player.x - position.x, player.y - position.y);
+    const distance = distanceBetween(player, position);
 
-    // Talk immediately if already nearby.
+    // Start dialogue immediately if nearby.
     if (distance <= NPC_TALK_DISTANCE) {
       onReachedNPC(npc);
       return true;
     }
 
-    // Possible standing positions around NPC.
+    /* ===================================
+       APPROACH POSITIONS
+       =================================== */
+
     const offsets = [
       [0, 39],
       [39, 0],
@@ -729,34 +749,27 @@ export function createClickNavigation(
       [-34, -34],
     ];
 
+    // Find suitable standing positions
+    // around the villager.
     const candidates = offsets
-      .map(([dx, dy]) => {
-        return {
-          x: position.x + dx,
-          y: position.y + dy,
-        };
-      })
+      .map(([dx, dy]) => ({
+        x: position.x + dx,
+        y: position.y + dy,
+      }))
 
-      .filter((candidate) => {
-        return canWalkAt(candidate.x, candidate.y, pond);
-      })
+      .filter((candidate) => canWalkAt(candidate.x, candidate.y, pond))
 
-      .sort((a, b) => {
-        const distanceA = Math.hypot(player.x - a.x, player.y - a.y);
+      .sort((a, b) => distanceBetween(player, a) - distanceBetween(player, b));
 
-        const distanceB = Math.hypot(player.x - b.x, player.y - b.y);
-
-        return distanceA - distanceB;
-      });
-
-    // Try each possible approach position.
+    // Try available positions until
+    // a valid route is found.
     for (const candidate of candidates) {
-      const found = followRoute(candidate, {
-        type: "npc",
-        npc,
-      });
-
-      if (found) {
+      if (
+        followRoute(candidate, {
+          type: "npc",
+          npc,
+        })
+      ) {
         return true;
       }
     }
@@ -765,13 +778,13 @@ export function createClickNavigation(
   }
 
   /* =====================================
-     UPDATE MOVEMENT
+     UPDATE PLAYER MOVEMENT
      ===================================== */
 
   /**
-   * Follow the calculated route.
+   * Move along the current route.
    *
-   * Called once per frame by sketch.js.
+   * Called every frame by sketch.js.
    */
   function tick(dt) {
     if (waypoints.length === 0) {
@@ -782,15 +795,25 @@ export function createClickNavigation(
 
     const arrived = stepToward(player, target, dt, pond);
 
+    /* ===================================
+       WAYPOINT COMPLETED
+       =================================== */
+
     if (arrived) {
       waypoints.shift();
     } else if (!player.walking) {
-      // An obstacle prevented movement.
+
+    /* ===================================
+       MOVEMENT BLOCKED
+       =================================== */
       reset();
       return;
     }
 
-    // Complete the route.
+    /* ===================================
+       ROUTE COMPLETED
+       =================================== */
+
     if (waypoints.length === 0) {
       const completedAction = action;
 
@@ -801,7 +824,7 @@ export function createClickNavigation(
   }
 
   /* =====================================
-     PUBLIC CONTROLLER METHODS
+     PUBLIC NAVIGATION API
      ===================================== */
 
   return {
