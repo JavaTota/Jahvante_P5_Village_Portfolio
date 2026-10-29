@@ -1,6 +1,26 @@
 // Content is deliberately separate from the p5 sketch so projects can be added without touching game logic.
 // Professional details are based on the supplied resume and reference letters.
+
+/**
+ * Village building locations.
+ *
+ * All positions use tile coordinates.
+ *
+ * x, y         → Top-left corner of the building
+ * w, h         → Building width and height
+ * doorX, doorY → Walkable tile outside the entrance
+ *
+ * Layout:
+ * - Three buildings north of the main street
+ * - Three buildings south of the main street
+ * - Houses never overlap the street network
+ */
+
 export const buildings = [
+  // ==========================================
+  // NORTH SIDE OF THE VILLAGE
+  // ==========================================
+
   {
     id: "projects",
     name: "PROJECT LAB",
@@ -8,15 +28,20 @@ export const buildings = [
     short: "The things I build",
     icon: "⌘",
     color: "#ef8e67",
+
     x: 8,
-    y: 7,
+    y: 5,
     w: 9,
     h: 7,
+
     doorX: 12,
-    doorY: 14,
+    doorY: 12,
+
     description:
-      "Explore three featured software projects, with their architecture, tech stack, live links and repositories.",
+      "Explore my software projects, their architecture, " +
+      "technologies, live websites and repositories.",
   },
+
   {
     id: "experience",
     name: "GUILD HALL",
@@ -24,15 +49,20 @@ export const buildings = [
     short: "Where I have worked",
     icon: "★",
     color: "#678cc6",
+
     x: 28,
-    y: 5,
+    y: 4,
     w: 9,
     h: 7,
+
     doorX: 32,
-    doorY: 12,
+    doorY: 11,
+
     description:
-      "See my freelance work, FinSight AI backend role, and Trep DigitalX internship — including my work for RIBER Italia.",
+      "Explore my freelance work, FinSight AI backend role, " +
+      "and Trep DigitalX internship.",
   },
+
   {
     id: "skills",
     name: "SKILL SHOP",
@@ -40,15 +70,24 @@ export const buildings = [
     short: "Tools & technologies",
     icon: "◆",
     color: "#63ad8b",
+
     x: 47,
-    y: 7,
+    y: 5,
     w: 9,
     h: 7,
+
     doorX: 51,
-    doorY: 14,
+    doorY: 12,
+
     description:
-      "View my frontend, backend, databases, testing, delivery tools, and the skills I am learning next.",
+      "Discover my frontend, backend, databases, " +
+      "testing tools, and technologies.",
   },
+
+  // ==========================================
+  // SOUTH SIDE OF THE VILLAGE
+  // ==========================================
+
   {
     id: "about",
     name: "MY HOME",
@@ -56,15 +95,20 @@ export const buildings = [
     short: "The developer behind the game",
     icon: "⌂",
     color: "#b492d5",
+
     x: 12,
     y: 28,
     w: 9,
     h: 7,
+
     doorX: 16,
     doorY: 35,
+
     description:
-      "Meet the developer behind the alien, read about my approach to building software, and see my education.",
+      "Learn more about me, my background, " +
+      "education, and software development journey.",
   },
+
   {
     id: "credentials",
     name: "TROPHY HALL",
@@ -72,15 +116,20 @@ export const buildings = [
     short: "Badges, diplomas & references",
     icon: "♛",
     color: "#d9ae54",
+
     x: 28,
     y: 28,
     w: 9,
     h: 7,
+
     doorX: 32,
     doorY: 35,
+
     description:
-      "View my Coding Temple specialist badges, diplomas, course certificates, and professional recommendation letters.",
+      "Explore my certifications, specialist badges, " +
+      "training, and professional recommendations.",
   },
+
   {
     id: "contact",
     name: "POST OFFICE",
@@ -88,16 +137,20 @@ export const buildings = [
     short: "Start a conversation",
     icon: "✉",
     color: "#e0ad5c",
+
     x: 43,
     y: 28,
     w: 9,
     h: 7,
+
     doorX: 47,
     doorY: 35,
+
     description:
-      "Send a message, connect on LinkedIn, inspect my GitHub, or download my résumé.",
+      "Contact me, visit my GitHub and LinkedIn, " + "or download my résumé.",
   },
 ];
+
 export const projects = [
   {
     title: "Advanced API Development Platform",
